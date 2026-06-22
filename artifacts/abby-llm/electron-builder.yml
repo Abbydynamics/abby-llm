@@ -1,0 +1,48 @@
+appId: com.abby.llm
+productName: Abby LLM
+executableName: abby-llm
+copyright: Abby LLM
+
+directories:
+  output: release
+  buildResources: build-resources
+
+# Bundled at the app root
+files:
+  - dist-electron/**/*
+
+# The frontend build and the embedded server are shipped as extra resources.
+extraResources:
+  - from: dist/public
+    to: public
+  - from: server-dist
+    to: server
+
+publish:
+  provider: github
+  releaseType: release
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: Abby-LLM-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Abby LLM
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.developer-tools
+
+linux:
+  target:
+    - AppImage
+  category: Development

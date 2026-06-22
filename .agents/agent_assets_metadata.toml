@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "ipwdD6BJSP3jvS1qgM4oy"
+uri = "file://artifacts/abby-llm/src/assets/abby-brain.png"
+type = "image"
+title = "abby glass brain"
+
+[[generated]]
+id = "oWp5pNrKd5GB8A3FridfJ"
+uri = "file://artifacts/abby-llm/src/assets/abby-logo.png"
+type = "image"
+title = "abby logo mark"

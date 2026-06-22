@@ -1,0 +1,9 @@
+# Build outputs
+dist/
+dist-electron/
+server-dist/
+release/
+.tsbuildinfo
+
+# Desktop runtime data
+artifacts/api-server/data/

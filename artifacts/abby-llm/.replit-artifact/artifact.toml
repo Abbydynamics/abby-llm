@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Abby LLM"
+version = "1.0.0"
+id = "artifacts/abby-llm"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25845
+
+[services.development]
+run = "pnpm --filter @workspace/abby-llm run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/abby-llm", "run", "build" ]
+publicDir = "artifacts/abby-llm/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25845"
+BASE_PATH = "/"

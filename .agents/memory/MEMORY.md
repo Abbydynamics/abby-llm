@@ -1,0 +1,1 @@
+- [Tailwind v4 @apply custom classes](tailwind-v4-apply.md) — @apply only works with real utilities, NOT custom classes; composing `.x { @apply my-custom }` throws "unknown utility class".
