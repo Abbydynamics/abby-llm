@@ -7,9 +7,35 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { api, type DatasetMeta, type TrainingState, type ModelInfo } from "@/lib/api";
+import { api, type DatasetMeta, type TrainingState, type ModelInfo, type AgentFile } from "@/lib/api";
 
 export type ModelName = "AbbyCoder 150M" | "AbbyCoder 500M" | "AbbyGPT 1B";
+
+export interface NeuralState {
+  modelExists: boolean;    // .gguf файл есть на диске
+  modelSize: number;       // байт
+  loaded: boolean;         // модель в памяти (готова к inference)
+  loading: boolean;        // идёт загрузка в память
+  downloading: boolean;    // идёт скачивание файла
+  downloadProgress: number; // 0–100
+  downloadSpeed: number;   // байт/сек
+  downloadBytes: number;   // скачано байт
+  downloadTotal: number;   // всего байт
+  error: string | null;
+}
+
+const NEURAL_INITIAL: NeuralState = {
+  modelExists: false,
+  modelSize: 0,
+  loaded: false,
+  loading: false,
+  downloading: false,
+  downloadProgress: 0,
+  downloadSpeed: 0,
+  downloadBytes: 0,
+  downloadTotal: 0,
+  error: null,
+};
 
 interface AbbyContextValue {
   model: ModelName;
@@ -28,6 +54,19 @@ interface AbbyContextValue {
   uploading: boolean;
   error: string | null;
   online: boolean;
+  // Агент-файлы (сгенерированные Abby)
+  agentFiles: AgentFile[];
+  setAgentFiles: (files: AgentFile[]) => void;
+  previewFile: string | null;
+  setPreviewFile: (name: string | null) => void;
+  activeAgentFile: string | null;
+  setActiveAgentFile: (name: string | null) => void;
+  // Нейронный движок
+  neuralState: NeuralState;
+  downloadNeuralModel: () => Promise<void>;
+  cancelNeuralDownload: () => Promise<void>;
+  loadNeuralModel: () => Promise<void>;
+  unloadNeuralModel: () => Promise<void>;
 }
 
 const AbbyContext = createContext<AbbyContextValue | null>(null);
@@ -40,6 +79,10 @@ export function AbbyProvider({ children }: { children: ReactNode }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
+  const [agentFiles, setAgentFiles] = useState<AgentFile[]>([]);
+  const [previewFile, setPreviewFile] = useState<string | null>(null);
+  const [activeAgentFile, setActiveAgentFile] = useState<string | null>(null);
+  const [neuralState, setNeuralState] = useState<NeuralState>(NEURAL_INITIAL);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshDatasets = useCallback(async () => {
@@ -87,6 +130,121 @@ export function AbbyProvider({ children }: { children: ReactNode }) {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [refreshTraining, isRunning]);
+
+  // ---- Нейронный движок: инициализация и подписки ----------------------------
+
+  useEffect(() => {
+    const bridge = window.abby;
+    if (!bridge) return;
+
+    // Проверяем статус модели на диске при запуске
+    bridge.getModelStatus().then((status) => {
+      setNeuralState((prev) => ({
+        ...prev,
+        modelExists: status.exists,
+        modelSize: status.size,
+        loaded: status.loaded,
+      }));
+    });
+
+    // Прогресс скачивания
+    const unsubProgress = bridge.onModelProgress((data) => {
+      setNeuralState((prev) => ({
+        ...prev,
+        downloading: data.percent < 100,
+        downloadProgress: data.percent,
+        downloadSpeed: data.speed,
+        downloadBytes: data.downloaded,
+        downloadTotal: data.total,
+        modelExists: data.percent >= 100 ? true : prev.modelExists,
+      }));
+    });
+
+    // Статус нейронного движка (load/unload)
+    const unsubNeural = bridge.onNeuralStatus((data) => {
+      setNeuralState((prev) => ({
+        ...prev,
+        loading: data.loading,
+        loaded: data.loaded ?? prev.loaded,
+      }));
+    });
+
+    return () => {
+      unsubProgress();
+      unsubNeural();
+    };
+  }, []);
+
+  // ---- Нейронный движок: действия --------------------------------------------
+
+  const downloadNeuralModel = useCallback(async () => {
+    const bridge = window.abby;
+    if (!bridge) return;
+    setNeuralState((prev) => ({
+      ...prev,
+      downloading: true,
+      error: null,
+      downloadProgress: 0,
+    }));
+    const result = await bridge.downloadModel();
+    if (result.error) {
+      setNeuralState((prev) => ({
+        ...prev,
+        downloading: false,
+        error: result.error ?? null,
+      }));
+    } else {
+      // После успешного скачивания обновляем статус
+      const status = await bridge.getModelStatus();
+      setNeuralState((prev) => ({
+        ...prev,
+        downloading: false,
+        modelExists: status.exists,
+        modelSize: status.size,
+        downloadProgress: 100,
+      }));
+    }
+  }, []);
+
+  const cancelNeuralDownload = useCallback(async () => {
+    const bridge = window.abby;
+    if (!bridge) return;
+    await bridge.cancelDownload();
+    setNeuralState((prev) => ({
+      ...prev,
+      downloading: false,
+      downloadProgress: 0,
+    }));
+  }, []);
+
+  const loadNeuralModel = useCallback(async () => {
+    const bridge = window.abby;
+    if (!bridge) return;
+    setNeuralState((prev) => ({ ...prev, loading: true, error: null }));
+    const result = await bridge.loadNeuralModel();
+    if (result.error) {
+      setNeuralState((prev) => ({
+        ...prev,
+        loading: false,
+        error: result.error ?? null,
+      }));
+    } else {
+      setNeuralState((prev) => ({
+        ...prev,
+        loading: false,
+        loaded: true,
+      }));
+    }
+  }, []);
+
+  const unloadNeuralModel = useCallback(async () => {
+    const bridge = window.abby;
+    if (!bridge) return;
+    await bridge.unloadNeuralModel();
+    setNeuralState((prev) => ({ ...prev, loaded: false }));
+  }, []);
+
+  // ---- Dataset/Training actions -----------------------------------------------
 
   const uploadFiles = useCallback(
     async (files: File[]) => {
@@ -167,6 +325,17 @@ export function AbbyProvider({ children }: { children: ReactNode }) {
         uploading,
         error,
         online,
+        agentFiles,
+        setAgentFiles,
+        previewFile,
+        setPreviewFile,
+        activeAgentFile,
+        setActiveAgentFile,
+        neuralState,
+        downloadNeuralModel,
+        cancelNeuralDownload,
+        loadNeuralModel,
+        unloadNeuralModel,
       }}
     >
       {children}

@@ -21,7 +21,8 @@ await build({
   target: "node20",
   format: "cjs",
   outExtension: { ".js": ".cjs" },
-  external: ["electron"],
+  // electron и node-llama-cpp — нативные зависимости, не бандлим.
+  external: ["electron", "node-llama-cpp"],
   sourcemap: false,
   logLevel: "info",
 });

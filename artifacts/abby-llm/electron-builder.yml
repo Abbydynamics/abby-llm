@@ -10,6 +10,11 @@ directories:
 # Bundled at the app root
 files:
   - dist-electron/**/*
+  - node_modules/node-llama-cpp/**/*
+
+# Нативные аддоны нельзя хранить внутри asar — распаковываем рядом.
+asarUnpack:
+  - "node_modules/node-llama-cpp/**/*"
 
 # The frontend build and the embedded server are shipped as extra resources.
 extraResources:
