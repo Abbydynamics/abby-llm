@@ -3,6 +3,7 @@ import { useAbby } from "@/hooks/useAbby";
 import type { ModelName } from "@/App";
 import type { AgentStep } from "@/lib/api";
 import { parseProject, buildPrompt, inferProjectName } from "@/lib/parseFiles";
+import { injectTheme } from "@/lib/theme";
 import {
   Send, ChevronDown, Sparkles, Cpu, Wrench, Brain,
   CheckCircle2, Clock, Loader2, Wifi, WifiOff, FileCode2,
@@ -142,6 +143,9 @@ export default function AbbyChat() {
       return;
     }
 
+    // Подключаем дизайн-систему и к шаблонному (fallback) пути — единый премиальный вид.
+    const files = injectTheme(result.files);
+
     placeholderSteps = result.steps.map(s => ({ label: s.label, status: "pending" as const }));
 
     setMessages(p => [...p, {
@@ -150,7 +154,7 @@ export default function AbbyChat() {
       time: now(),
       agentSteps: [...placeholderSteps],
       agentDone: false,
-      agentFiles: result.files.map(f => f.name),
+      agentFiles: files.map(f => f.name),
       agentPreview: !!result.previewFile,
     }]);
     // loading удерживаем включённым на всё время анимации шагов: send() блокируется,
@@ -190,9 +194,9 @@ export default function AbbyChat() {
     }));
 
     setProjectName(inferProjectName(text));
-    setAgentFiles(result.files);
+    setAgentFiles(files);
     if (result.previewFile) setPreviewFile(result.previewFile);
-    if (result.files.length > 0) setActiveAgentFile(result.files[0].name);
+    if (files.length > 0) setActiveAgentFile(files[0].name);
 
     await new Promise(r => setTimeout(r, 400));
     setMessages(p => [...p, {

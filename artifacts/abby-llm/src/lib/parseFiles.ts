@@ -8,6 +8,7 @@
  */
 
 import type { AgentFile } from "./api";
+import { injectTheme } from "./theme";
 
 export interface ParsedProject {
   files: AgentFile[];
@@ -140,13 +141,16 @@ export function parseProject(raw: string, prompt = ""): ParsedProject {
   }
   proseParts.push(raw.slice(lastIndex));
 
+  // Подключаем дизайн-систему: даже слабый CSS от модели получает премиальную базу.
+  const enriched = injectTheme(files);
+
   const previewFile =
-    files.find((f) => /(^|\/)index\.html$/i.test(f.name))?.name ??
-    files.find((f) => /\.html$/i.test(f.name))?.name ??
+    enriched.find((f) => /(^|\/)index\.html$/i.test(f.name))?.name ??
+    enriched.find((f) => /\.html$/i.test(f.name))?.name ??
     null;
 
   return {
-    files,
+    files: enriched,
     projectName: inferProjectName(prompt),
     previewFile,
     prose: proseParts.join("").replace(/\n{3,}/g, "\n\n").trim(),
@@ -186,11 +190,36 @@ export function inferProjectName(prompt: string): string {
  */
 export function buildPrompt(userRequest: string): string {
   return [
-    "Ты — Abby, ИИ-разработчик уровня Replit. Создай ПОЛНОСТЬЮ рабочий проект по запросу пользователя.",
+    "Ты — Abby, ИИ-разработчик уровня Replit с безупречным вкусом к дизайну.",
+    "Создай ПОЛНОСТЬЮ рабочий и КРАСИВЫЙ проект по запросу пользователя.",
+    "",
+    "ВАЖНО про дизайн-систему:",
+    "К проекту АВТОМАТИЧЕСКИ подключается файл abby-theme.css — современная тёмная",
+    "дизайн-система. Она уже задаёт премиальную базу, поэтому НЕ дублируй сбросы и",
+    "опирайся на неё:",
+    "• Дизайн-токены (CSS-переменные): var(--abby-bg), var(--abby-surface),",
+    "  var(--abby-text), var(--abby-muted), var(--abby-border), var(--abby-primary),",
+    "  var(--abby-primary-2), var(--abby-accent), var(--abby-radius), var(--abby-shadow),",
+    "  var(--abby-grad) (готовый градиент). Используй ИМЕННО их для цветов/радиусов/теней.",
+    "• Готовые утилиты-классы: .container (центр.контейнер), .section (вертик. отступы),",
+    "  .card, .grid-auto (адаптивная сетка), .stack, .flex, .center, .badge,",
+    "  .gradient-text (градиентный текст), .glass, .btn-outline, .fade-up (анимация).",
+    "• <button>, <input>, <textarea>, <select>, <table>, ссылки и заголовки уже",
+    "  стилизованы красиво — используй семантический HTML, не изобретай заново.",
+    "",
+    "Принципы качественного дизайна (обязательно):",
+    "1. Чёткая иерархия: крупный выразительный hero-заголовок (можно .gradient-text),",
+    "   подзаголовок-описание (.muted), затем понятные секции (.section + .container).",
+    "2. Воздух и ритм: щедрые отступы, выравнивание по сетке, ничего не лепи вплотную.",
+    "3. Глубина: карточки (.card) с тенями и тонкими границами, лёгкие hover-эффекты.",
+    "4. Адаптивность: mobile-first, .grid-auto для карточек, без горизонтального скролла.",
+    "5. Цельная палитра из токенов, акцент — фирменный фиолетово-розовый градиент.",
+    "6. Микроанимации: плавные transition на hover, появление через .fade-up.",
+    "7. Реальный, работающий контент и логика — никаких 'lorem ipsum' и заглушек.",
     "",
     "Строгие правила вывода:",
     "1. Выведи КАЖДЫЙ файл отдельным блоком кода Markdown.",
-    "2. В первой строке блока после языка укажи ИМЯ ФАЙЛА. Формат строго такой:",
+    "2. В первой строке блока после языка укажи ИМЯ ФАЙЛА строго так:",
     "```html index.html",
     "...код...",
     "```",
@@ -200,8 +229,10 @@ export function buildPrompt(userRequest: string): string {
     "```js script.js",
     "...код...",
     "```",
-    "3. Используй относительные пути: подключай style.css и script.js в index.html.",
-    "4. Делай красивый, современный, адаптивный дизайн и реально работающий код.",
+    "3. Относительные пути: в index.html подключай style.css и script.js. НЕ подключай",
+    "   abby-theme.css вручную — он добавится сам.",
+    "4. В style.css пиши ТОЛЬКО специфичные стили проекта (layout, уникальные блоки),",
+    "   переиспользуя токены var(--abby-*). Базовые сбросы/типографику не повторяй.",
     "5. Пиши минимум пояснений вне блоков кода — только сами файлы.",
     "",
     `Запрос пользователя: ${userRequest}`,
