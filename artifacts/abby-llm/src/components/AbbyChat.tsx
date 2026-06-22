@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAbby } from "@/hooks/useAbby";
 import type { ModelName } from "@/App";
 import type { AgentStep } from "@/lib/api";
+import { parseProject, buildPrompt, inferProjectName } from "@/lib/parseFiles";
 import {
   Send, ChevronDown, Sparkles, Cpu, Wrench, Brain,
   CheckCircle2, Clock, Loader2, Wifi, WifiOff, FileCode2,
@@ -95,7 +96,7 @@ function AgentStepsCard({ steps, done, files, hasPreview, onOpen }: {
 export default function AbbyChat() {
   const {
     model, setModel, training, datasets, online,
-    setAgentFiles, setPreviewFile, setActiveAgentFile,
+    setAgentFiles, setPreviewFile, setActiveAgentFile, setProjectName,
     neuralState,
   } = useAbby();
   const [activeTab, setActiveTab] = useState<ChatTab>("Chat");
@@ -152,7 +153,9 @@ export default function AbbyChat() {
       agentFiles: result.files.map(f => f.name),
       agentPreview: !!result.previewFile,
     }]);
-    setLoading(false);
+    // loading удерживаем включённым на всё время анимации шагов: send() блокируется,
+    // пока loading=true, поэтому новые сообщения не вставятся и обновление шагов
+    // не попадёт в чужое сообщение (защита от гонки).
 
     const STEP_MS = 500;
     for (let i = 0; i < placeholderSteps.length; i++) {
@@ -186,6 +189,7 @@ export default function AbbyChat() {
       };
     }));
 
+    setProjectName(inferProjectName(text));
     setAgentFiles(result.files);
     if (result.previewFile) setPreviewFile(result.previewFile);
     if (result.files.length > 0) setActiveAgentFile(result.files[0].name);
@@ -197,7 +201,94 @@ export default function AbbyChat() {
       time: now(),
     }]);
 
+    setLoading(false);
     void msgIdx;
+  }
+
+  /** Анимирует шаги последнего агент-сообщения по очереди. */
+  async function animateSteps(count: number) {
+    const STEP_MS = 450;
+    for (let i = 0; i < count; i++) {
+      await new Promise(r => setTimeout(r, STEP_MS));
+      setMessages(p => p.map((m, mi) => {
+        if (mi !== p.length - 1 || !m.agentSteps) return m;
+        return {
+          ...m,
+          agentSteps: m.agentSteps.map((s, si) => ({
+            ...s,
+            status: si < i ? "done" : si === i ? "running" : "pending",
+          })),
+        };
+      }));
+    }
+    await new Promise(r => setTimeout(r, 300));
+    setMessages(p => p.map((m, mi) => {
+      if (mi !== p.length - 1 || !m.agentSteps) return m;
+      return { ...m, agentDone: true, agentSteps: m.agentSteps.map(s => ({ ...s, status: "done" })) };
+    }));
+  }
+
+  /** Сборка проекта через нейронную модель (Qwen): код из ответа → реальные файлы. */
+  async function handleNeuralBuild(text: string) {
+    setLoading(true);
+    let raw = "";
+    try {
+      const res = await window.abby!.neuralChat(buildPrompt(text));
+      if (res.error) {
+        setMessages(p => [...p, { role: "assistant", content: `Ошибка нейронной модели: ${res.error}`, time: now(), engine: "neural" }]);
+        setLoading(false);
+        return;
+      }
+      raw = res.response ?? "";
+    } catch {
+      setMessages(p => [...p, { role: "assistant", content: "Ошибка соединения с нейронной моделью.", time: now() }]);
+      setLoading(false);
+      return;
+    }
+
+    const project = parseProject(raw, text);
+
+    // Модель не выдала распознаваемых файлов — показываем ответ как обычно.
+    if (project.files.length === 0) {
+      setMessages(p => [...p, { role: "assistant", content: raw, time: now(), engine: "neural" }]);
+      setLoading(false);
+      return;
+    }
+    // loading удерживаем включённым до конца анимации шагов (защита от гонки).
+
+    const steps: StepState[] = [
+      { label: "Анализ запроса", status: "pending" },
+      { label: `Генерация проекта «${project.projectName}»`, status: "pending" },
+      { label: `Создание файлов (${project.files.length})`, status: "pending" },
+      { label: project.previewFile ? "Сборка предпросмотра" : "Финализация", status: "pending" },
+    ];
+    setMessages(p => [...p, {
+      role: "assistant",
+      content: "",
+      time: now(),
+      engine: "neural",
+      agentSteps: steps,
+      agentDone: false,
+      agentFiles: project.files.map(f => f.name),
+      agentPreview: !!project.previewFile,
+    }]);
+
+    await animateSteps(steps.length);
+
+    // Записываем проект в виртуальную ФС → Explorer + редактор + Preview.
+    setProjectName(project.projectName);
+    setAgentFiles(project.files);
+    setActiveAgentFile(project.files[0].name);
+    setPreviewFile(project.previewFile);
+
+    const names = project.files.map(f => f.name).join(", ");
+    const summary = project.previewFile
+      ? `Готово! Создал проект «${project.projectName}» — ${project.files.length} файл(ов): ${names}. Файлы открыты в редакторе, нажми вкладку Preview, чтобы увидеть результат.`
+      : `Готово! Создал проект «${project.projectName}» — ${project.files.length} файл(ов): ${names}. Файлы открыты в редакторе слева.`;
+
+    await new Promise(r => setTimeout(r, 300));
+    setMessages(p => [...p, { role: "assistant", content: summary, time: now(), engine: "neural" }]);
+    setLoading(false);
   }
 
   async function send() {
@@ -207,9 +298,16 @@ export default function AbbyChat() {
     setMessages(p => [...p, { role: "user", content: text, time: now() }]);
 
     // Агент-задача?
-    const isAgentTask = /^(создай|сделай|напиши|сгенерируй|построй|create|build|make|write|generate)\b/i.test(text);
+    // ВНИМАНИЕ: \b в JS работает только для ASCII и не срабатывает после кириллицы,
+    // поэтому используем явную границу: пробел или конец строки.
+    const isAgentTask = /^(создай|сделай|напиши|сгенерируй|построй|разработай|create|build|make|write|generate)(\s|$)/i.test(text);
     if (isAgentTask) {
-      await handleAgent(text);
+      // Если Qwen загружена — строим из её ответа; иначе — шаблонный агент бэкенда.
+      if (neuralState.loaded && window.abby?.neuralChat) {
+        await handleNeuralBuild(text);
+      } else {
+        await handleAgent(text);
+      }
       return;
     }
 

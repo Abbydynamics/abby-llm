@@ -54,13 +54,16 @@ interface AbbyContextValue {
   uploading: boolean;
   error: string | null;
   online: boolean;
-  // Агент-файлы (сгенерированные Abby)
+  // Агент-файлы (сгенерированные Abby) — виртуальная файловая система проекта
   agentFiles: AgentFile[];
   setAgentFiles: (files: AgentFile[]) => void;
   previewFile: string | null;
   setPreviewFile: (name: string | null) => void;
   activeAgentFile: string | null;
   setActiveAgentFile: (name: string | null) => void;
+  projectName: string;
+  setProjectName: (name: string) => void;
+  clearProject: () => void;
   // Нейронный движок
   neuralState: NeuralState;
   downloadNeuralModel: () => Promise<void>;
@@ -71,6 +74,48 @@ interface AbbyContextValue {
 
 const AbbyContext = createContext<AbbyContextValue | null>(null);
 
+const VFS_KEY = "abby.vfs.v1";
+
+interface VfsState {
+  files: AgentFile[];
+  previewFile: string | null;
+  activeFile: string | null;
+  projectName: string;
+}
+
+const VFS_EMPTY: VfsState = {
+  files: [],
+  previewFile: null,
+  activeFile: null,
+  projectName: "abby-project",
+};
+
+function loadVfs(): VfsState {
+  if (typeof window === "undefined") return VFS_EMPTY;
+  try {
+    const raw = window.localStorage.getItem(VFS_KEY);
+    if (!raw) return VFS_EMPTY;
+    const parsed = JSON.parse(raw) as Partial<VfsState>;
+    return {
+      files: Array.isArray(parsed.files) ? parsed.files : [],
+      previewFile: parsed.previewFile ?? null,
+      activeFile: parsed.activeFile ?? null,
+      projectName: parsed.projectName ?? "abby-project",
+    };
+  } catch {
+    return VFS_EMPTY;
+  }
+}
+
+function saveVfs(state: VfsState): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(VFS_KEY, JSON.stringify(state));
+  } catch {
+    /* квота переполнена — игнорируем */
+  }
+}
+
 export function AbbyProvider({ children }: { children: ReactNode }) {
   const [model, setModel] = useState<ModelName>("AbbyCoder 150M");
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -79,11 +124,24 @@ export function AbbyProvider({ children }: { children: ReactNode }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
-  const [agentFiles, setAgentFiles] = useState<AgentFile[]>([]);
-  const [previewFile, setPreviewFile] = useState<string | null>(null);
-  const [activeAgentFile, setActiveAgentFile] = useState<string | null>(null);
+  const [agentFiles, setAgentFiles] = useState<AgentFile[]>(() => loadVfs().files);
+  const [previewFile, setPreviewFile] = useState<string | null>(() => loadVfs().previewFile);
+  const [activeAgentFile, setActiveAgentFile] = useState<string | null>(() => loadVfs().activeFile);
+  const [projectName, setProjectName] = useState<string>(() => loadVfs().projectName);
   const [neuralState, setNeuralState] = useState<NeuralState>(NEURAL_INITIAL);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Сохраняем проект (VFS) в localStorage — он переживает перезагрузку, как в Replit.
+  useEffect(() => {
+    saveVfs({ files: agentFiles, previewFile, activeFile: activeAgentFile, projectName });
+  }, [agentFiles, previewFile, activeAgentFile, projectName]);
+
+  const clearProject = useCallback(() => {
+    setAgentFiles([]);
+    setPreviewFile(null);
+    setActiveAgentFile(null);
+    setProjectName("abby-project");
+  }, []);
 
   const refreshDatasets = useCallback(async () => {
     try {
@@ -331,6 +389,9 @@ export function AbbyProvider({ children }: { children: ReactNode }) {
         setPreviewFile,
         activeAgentFile,
         setActiveAgentFile,
+        projectName,
+        setProjectName,
+        clearProject,
         neuralState,
         downloadNeuralModel,
         cancelNeuralDownload,

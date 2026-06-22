@@ -40,6 +40,24 @@ export interface ModelInfo {
   trained: boolean;
 }
 
+export interface AgentFile {
+  name: string;
+  language: string;
+  content: string;
+}
+
+export interface AgentStep {
+  label: string;
+}
+
+export interface AgentResult {
+  intent: string;
+  steps: AgentStep[];
+  files: AgentFile[];
+  summary: string;
+  previewFile?: string;
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -128,6 +146,16 @@ export const api = {
         body: JSON.stringify({ message, model }),
       }),
     );
+  },
+
+  async agent(message: string): Promise<AgentResult> {
+    const res = await fetch(`${API_BASE}/agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    if (res.status === 422) throw new Error("unsupported_intent");
+    return json<AgentResult>(res);
   },
 
   async listModels(): Promise<ModelInfo[]> {
