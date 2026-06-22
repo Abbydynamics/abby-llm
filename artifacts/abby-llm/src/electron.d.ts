@@ -8,6 +8,9 @@ export interface AbbyDesktopApi {
   pickFolder: () => Promise<string | null>;
   pickFiles: () => Promise<string[]>;
   openExternal: (url: string) => Promise<void>;
+  minimizeWindow: () => Promise<void>;
+  toggleMaximizeWindow: () => Promise<boolean>;
+  closeWindow: () => Promise<void>;
   isDesktop: true;
 }
 

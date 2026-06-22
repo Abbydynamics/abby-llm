@@ -161,6 +161,14 @@
   box-shadow: 0 0 12px hsl(var(--abby-violet) / 0.7);
 }
 
+/* Перетаскивание окна без нативной рамки (desktop/Electron). */
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
 .nav-icon-btn {
   @apply w-10 h-10 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer;
 }

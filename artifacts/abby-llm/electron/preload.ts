@@ -12,6 +12,11 @@ const abbyApi = {
   pickFiles: (): Promise<string[]> => ipcRenderer.invoke("abby:pickFiles"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("abby:openExternal", url),
+  minimizeWindow: (): Promise<void> =>
+    ipcRenderer.invoke("abby:window:minimize"),
+  toggleMaximizeWindow: (): Promise<boolean> =>
+    ipcRenderer.invoke("abby:window:toggleMaximize"),
+  closeWindow: (): Promise<void> => ipcRenderer.invoke("abby:window:close"),
   isDesktop: true as const,
 };
 

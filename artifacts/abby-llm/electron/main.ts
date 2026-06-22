@@ -88,6 +88,8 @@ async function createWindow(): Promise<void> {
     backgroundColor: "#0b1020",
     title: "Abby LLM",
     show: false,
+    frame: false, // без нативной рамки — окном управляет внутренняя оболочка (TopBar)
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -142,6 +144,22 @@ ipcMain.handle("abby:pickFiles", async () => {
 ipcMain.handle("abby:openExternal", (_e, url: string) =>
   shell.openExternal(url),
 );
+
+// ---- Управление окном (окно без рамки: кнопки живут во внутренней оболочке) ----
+
+ipcMain.handle("abby:window:minimize", () => mainWindow?.minimize());
+
+ipcMain.handle("abby:window:toggleMaximize", () => {
+  if (!mainWindow) return false;
+  if (mainWindow.isMaximized()) {
+    mainWindow.unmaximize();
+    return false;
+  }
+  mainWindow.maximize();
+  return true;
+});
+
+ipcMain.handle("abby:window:close", () => mainWindow?.close());
 
 app.whenReady().then(async () => {
   try {

@@ -63,6 +63,38 @@
     .download:hover { transform: translateY(-2px); box-shadow: 0 16px 40px hsl(var(--violet) / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.25); }
     .download[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
     .meta { margin-top: 16px; font-size: 12.5px; color: hsl(255 12% 60%); min-height: 18px; }
+    .datasets {
+      margin-top: 30px; padding-top: 24px;
+      border-top: 1px solid hsl(0 0% 100% / 0.08);
+    }
+    .datasets h2 {
+      font-size: 14px; font-weight: 700; color: hsl(255 20% 86%);
+      margin-bottom: 4px; letter-spacing: -0.2px;
+    }
+    .datasets p { font-size: 12.5px; color: hsl(255 12% 62%); line-height: 1.55; margin-bottom: 16px; }
+    .ds-grid { display: grid; gap: 10px; }
+    .ds-btn {
+      display: flex; align-items: center; gap: 12px; text-align: left;
+      text-decoration: none; color: hsl(255 22% 90%);
+      padding: 12px 14px; border-radius: 14px;
+      background: hsl(255 60% 70% / 0.06);
+      border: 1px solid hsl(0 0% 100% / 0.10);
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+    .ds-btn:hover {
+      transform: translateY(-1px);
+      background: hsl(var(--violet) / 0.16);
+      border-color: hsl(var(--violet) / 0.45);
+    }
+    .ds-ic {
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, hsl(var(--violet) / 0.85), hsl(var(--magenta) / 0.6));
+      color: #fff;
+    }
+    .ds-txt { display: flex; flex-direction: column; min-width: 0; }
+    .ds-title { font-size: 13.5px; font-weight: 600; }
+    .ds-sub { font-size: 11.5px; color: hsl(255 12% 62%); }
     .req {
       margin-top: 28px; padding-top: 20px;
       border-top: 1px solid hsl(0 0% 100% / 0.08);
@@ -91,6 +123,34 @@
       <span id="dl-text">Загрузка…</span>
     </a>
     <div class="meta" id="meta"></div>
+
+    <section class="datasets">
+      <h2>Датасеты для обучения</h2>
+      <p>Готовые наборы на русском. Скачай, добавь в раздел <b>Datasets</b> и запусти обучение, чтобы Abby лучше общалась.</p>
+      <div class="ds-grid">
+        <a class="ds-btn" href="https://github.com/__REPO__/releases/download/datasets-v1/abby-dialogi-obshchenie-ru.txt" download>
+          <span class="ds-ic" aria-hidden="true">💬</span>
+          <span class="ds-txt">
+            <span class="ds-title">Общение с пользователем</span>
+            <span class="ds-sub">Диалоги, вежливость, помощь и поддержка</span>
+          </span>
+        </a>
+        <a class="ds-btn" href="https://github.com/__REPO__/releases/download/datasets-v1/abby-tech-pomoshch-ru.txt" download>
+          <span class="ds-ic" aria-hidden="true">💻</span>
+          <span class="ds-txt">
+            <span class="ds-title">Помощь с кодом и техникой</span>
+            <span class="ds-sub">Программирование, отладка, базовые понятия</span>
+          </span>
+        </a>
+        <a class="ds-btn" href="https://github.com/__REPO__/releases/download/datasets-v1/abby-znaniya-fakty-ru.txt" download>
+          <span class="ds-ic" aria-hidden="true">🧠</span>
+          <span class="ds-txt">
+            <span class="ds-title">Общие знания и факты</span>
+            <span class="ds-sub">Наука, природа и познавательные ответы</span>
+          </span>
+        </a>
+      </div>
+    </section>
 
     <div class="req">
       <b>Системные требования:</b> Windows 10 / 11, 64-bit.<br />
