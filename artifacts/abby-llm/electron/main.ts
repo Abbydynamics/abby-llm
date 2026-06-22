@@ -24,8 +24,10 @@ let mainWindow: BrowserWindow | null = null;
 // ---- Нейронная модель -------------------------------------------------------
 
 const MODEL_FILENAME = "qwen2.5-7b-q4_k_m.gguf";
+// Цельный файл Q4_K_M (~4.68 ГБ). В официальном репозитории Qwen эта квантизация
+// разбита на части, поэтому берём single-file сборку bartowski.
 const MODEL_URL =
-  "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf";
+  "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf";
 
 let downloadActive = false;
 let downloadRequest: ReturnType<typeof https.get> | null = null;

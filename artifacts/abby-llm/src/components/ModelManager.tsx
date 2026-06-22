@@ -228,7 +228,7 @@ export default function ModelManager() {
           Источник:{" "}
           <button
             onClick={() => window.abby?.openExternal(
-              "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF"
+              "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF"
             )}
             className="text-[hsl(var(--abby-violet))] hover:underline cursor-pointer"
           >

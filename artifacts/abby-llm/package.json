@@ -1,6 +1,6 @@
 {
   "name": "@workspace/abby-llm",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Abby LLM — твоя собственная языковая модель (десктоп-приложение)",
   "author": "Abby LLM",
   "private": true,
