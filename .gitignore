@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Abby runtime data (datasets + model checkpoints) — not for VCS
+artifacts/api-server/data/

@@ -12,6 +12,7 @@
  */
 
 import { type Vocab } from "./tokenizer.js";
+import { type RetrievalIndex } from "./retrieval.js";
 
 export interface ModelConfig {
   name: string;
@@ -29,6 +30,8 @@ export interface AbbyLMState {
   totalUnigrams: number;
   // interpolation weights
   lambdas: [number, number, number];
+  // индекс поиска «вопрос → ответ» (если в данных были диалоги)
+  retrieval?: RetrievalIndex;
 }
 
 const SMOOTH = 0.1;
@@ -133,9 +136,9 @@ export function sampleNext(
   model: AbbyLMState,
   p2: number | null,
   p1: number | null,
-  opts: { temperature: number; topK: number },
+  opts: { temperature: number; topK: number; banned?: Set<number> },
 ): number {
-  const { temperature, topK } = opts;
+  const { temperature, topK, banned } = opts;
 
   // Candidate set: tokens seen after this context (fast path), else top unigrams.
   let candidates: number[] = [];
@@ -150,6 +153,10 @@ export function sampleNext(
       .slice(0, 200)
       .map(([k]) => Number(k));
     candidates = Array.from(new Set([...candidates, ...topUni]));
+  }
+  if (banned && banned.size) {
+    const filtered = candidates.filter((id) => !banned.has(id));
+    if (filtered.length) candidates = filtered;
   }
 
   const scored = candidates
@@ -176,7 +183,13 @@ export function sampleNext(
 export function generate(
   model: AbbyLMState,
   promptIds: number[],
-  opts: { maxTokens: number; temperature: number; topK: number; eosId: number },
+  opts: {
+    maxTokens: number;
+    temperature: number;
+    topK: number;
+    eosId: number;
+    banned?: Set<number>;
+  },
 ): number[] {
   const out: number[] = [];
   let p1: number | null = promptIds.at(-1) ?? null;

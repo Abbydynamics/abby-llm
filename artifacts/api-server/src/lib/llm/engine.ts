@@ -28,7 +28,43 @@ import {
   saveModel,
   loadModel,
 } from "./store.js";
+import { parseCorpus, buildRetrieval, queryRetrieval } from "./retrieval.js";
 import { logger } from "../logger.js";
+
+// Порог уверенности поиска: ниже него считаем, что подходящего ответа нет.
+const RETRIEVAL_THRESHOLD = 0.2;
+
+// Структурные/служебные токены, которые не должны попадать в ответ n-gram.
+const BANNED_TOKENS = new Set([
+  "пользователь",
+  "user",
+  "вопрос",
+  "question",
+  "abby",
+  "абби",
+  "ассистент",
+  "assistant",
+  "бот",
+  "ответ",
+  "answer",
+  ":",
+  "#",
+  ">",
+  ">>",
+  "—",
+  "-",
+  "*",
+]);
+
+/** Убирает остаточную разметку ролей и лишние пробелы из ответа n-gram. */
+function sanitizeReply(text: string): string {
+  return text
+    .replace(/\b(пользователь|user|abby|абби|ассистент|assistant|бот|вопрос|ответ)\s*:/gi, "")
+    .replace(/\s*:\s*/g, " ")
+    .replace(/\s+([.,!?;])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export type TrainingStatus = "idle" | "running" | "paused" | "completed" | "error";
 
@@ -110,7 +146,15 @@ class AbbyEngine {
       return { ok: false, error: "No datasets uploaded. Add data first." };
     }
 
-    const tokens = tokenize(text);
+    // Разбираем корпус: пары «вопрос/ответ» для поиска + чистый текст для n-gram
+    // (без разметки ролей и комментариев — иначе модель учит мусор-маркеры).
+    const { pairs, cleanText } = parseCorpus(text);
+    const trainText = cleanText.trim() ? cleanText : text;
+    this.log(
+      `Parsed corpus: ${pairs.length.toLocaleString()} Q/A pairs found`,
+    );
+
+    const tokens = tokenize(trainText);
     this.log(`Tokenizing... ${tokens.length.toLocaleString()} tokens`);
 
     const vocab = buildVocab(tokens, config.vocabSize);
@@ -123,6 +167,10 @@ class AbbyEngine {
     this.evalTokens = ids.slice(split);
 
     this.model = createModel(config, vocab);
+    if (pairs.length) {
+      this.model.retrieval = buildRetrieval(pairs);
+      this.log(`Retrieval index ready: ${pairs.length.toLocaleString()} answers`);
+    }
 
     this.state = {
       status: "running",
@@ -234,20 +282,39 @@ class AbbyEngine {
       };
     }
 
+    // 1) Поиск по обученным данным — связный выученный ответ на знакомый вопрос.
+    if (model.retrieval) {
+      const hit = queryRetrieval(model.retrieval, prompt);
+      if (hit && hit.score >= RETRIEVAL_THRESHOLD) {
+        return { reply: hit.answer, trained: true };
+      }
+    }
+
+    // 2) Запасной путь — генерация n-gram без структурных маркеров + чистка.
     const promptTokens = tokenize(prompt);
     const promptIds = encode(model.vocab, promptTokens);
     const eosId = model.vocab.tokenToId[EOS];
+    const banned = new Set<number>();
+    for (const tok of BANNED_TOKENS) {
+      const id = model.vocab.tokenToId[tok];
+      if (id != null) banned.add(id);
+    }
 
     const outIds = generate(model, promptIds, {
       maxTokens: opts?.maxTokens ?? 40,
-      temperature: opts?.temperature ?? 0.8,
+      temperature: opts?.temperature ?? 0.7,
       topK: opts?.topK ?? 40,
       eosId,
+      banned,
     });
 
-    let reply = decode(model.vocab, outIds);
-    if (!reply.trim()) {
-      reply = "Мне нужно больше данных для обучения, чтобы ответить точнее.";
+    const reply = sanitizeReply(decode(model.vocab, outIds));
+    if (reply.length < 2) {
+      return {
+        reply:
+          "Пока не нашла точного ответа в обученных данных. Добавьте больше примеров диалогов в Datasets и переобучите модель — так я отвечу точнее.",
+        trained: true,
+      };
     }
     return { reply, trained: true };
   }
