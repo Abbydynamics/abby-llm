@@ -19,9 +19,9 @@
     "dist:win": "pnpm run build:desktop && electron-builder --win",
     "dist:mac": "pnpm run build:desktop && electron-builder --mac",
     "dist:linux": "pnpm run build:desktop && electron-builder --linux",
-    "release:win": "pnpm run build:desktop && electron-builder --win --publish always",
-    "release:mac": "pnpm run build:desktop && electron-builder --mac --publish always",
-    "release:linux": "pnpm run build:desktop && electron-builder --linux --publish always"
+    "release:win": "pnpm run dist:win && node upload-release.mjs",
+    "release:mac": "pnpm run dist:mac && node upload-release.mjs",
+    "release:linux": "pnpm run dist:linux && node upload-release.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
