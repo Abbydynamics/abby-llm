@@ -1,0 +1,51 @@
+name: Release Desktop
+
+# Собирает установщик Abby LLM и публикует его в раздел Releases этого репозитория.
+# Запуск: вкладка Actions → "Release Desktop" → Run workflow,
+# либо пуш тега вида v1.0.0 (должен совпадать с version в artifacts/abby-llm/package.json).
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build Windows installer (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Verify tag matches app version (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          PKG=$(node -p "require('./artifacts/abby-llm/package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "tag=$TAG  package.json=$PKG"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::Тег v$TAG не совпадает с version=$PKG в artifacts/abby-llm/package.json. Обнови version и тег."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build & publish installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm --filter @workspace/abby-llm run release:win
