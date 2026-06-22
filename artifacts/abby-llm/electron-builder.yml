@@ -20,6 +20,8 @@ extraResources:
 
 publish:
   provider: github
+  owner: Abbydynamics
+  repo: abby-llm
   releaseType: release
 
 win:
