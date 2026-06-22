@@ -39,12 +39,10 @@ async function getOrCreateRelease() {
   if (res.ok) {
     const rel = await res.json();
     console.log(`Релиз ${tagName} найден (id=${rel.id}), ассеты: ${rel.assets.map(a => a.name).join(', ') || 'нет'}`);
-    // Удаляем битые/старые exe-ассеты (если есть)
+    // Удаляем ВСЕ старые ассеты (может быть bitый или дублирующийся)
     for (const asset of rel.assets) {
-      if (asset.name.endsWith('.exe') || asset.name === 'latest.yml') {
-        console.log(`Удаляю старый ассет: ${asset.name}`);
-        await apiFetch(`/releases/assets/${asset.id}`, { method: 'DELETE' });
-      }
+      console.log(`Удаляю старый ассет: ${asset.name}`);
+      await apiFetch(`/releases/assets/${asset.id}`, { method: 'DELETE' });
     }
     return rel.id;
   }
